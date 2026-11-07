@@ -13,6 +13,7 @@ next-env.d.ts
 # environnement (la config réelle reste locale)
 .env*
 !.env.example
+!.env.production
 
 # logs
 npm-debug.log*
