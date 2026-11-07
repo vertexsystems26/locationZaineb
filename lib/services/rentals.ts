@@ -1,6 +1,4 @@
-import { doc, getDocs, query, serverTimestamp, where, writeBatch } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { COLLECTIONS, rentalTransactionRef, rentalsCol } from "@/lib/firestore/collections";
+import { COLLECTIONS, loadFirestore, rentalTransactionId } from "@/lib/firestore/collections";
 import { mapRental } from "@/lib/firestore/mappers";
 import { todayKey } from "@/lib/dates";
 import {
@@ -49,22 +47,26 @@ function buildIncomeTransaction(rentalId: string, data: RentalData): Transaction
  * (en plus de la vérification en direct faite dans le formulaire).
  */
 async function assertNoOverlap(input: RentalInput, excludeId?: string): Promise<void> {
-  const snap = await getDocs(query(rentalsCol(), where("carId", "==", input.carId)));
+  const { sdk, db } = await loadFirestore();
+  const snap = await sdk.getDocs(
+    sdk.query(sdk.collection(db, COLLECTIONS.rentals), sdk.where("carId", "==", input.carId)),
+  );
   const conflicts = findConflicts(snap.docs.map(mapRental), { ...input, excludeId });
   if (conflicts.length) throw new RentalOverlapError(conflicts[0]);
 }
 
-/** Crée la location ET sa transaction « entrée » dans une seule opération atomique. */
+/** Crée la location ET sa transaction « entrée » dans une seule opération atomique (writeBatch). */
 export async function createRental(input: RentalInput, carLabel: string): Promise<string> {
   await assertNoOverlap(input);
-  const rentalRef = doc(rentalsCol());
+  const { sdk, db } = await loadFirestore();
+  const rentalRef = sdk.doc(sdk.collection(db, COLLECTIONS.rentals));
   const data = buildRentalData(input, carLabel);
 
-  const batch = writeBatch(db);
-  batch.set(rentalRef, { ...data, createdAt: serverTimestamp() });
-  batch.set(rentalTransactionRef(rentalRef.id), {
+  const batch = sdk.writeBatch(db);
+  batch.set(rentalRef, { ...data, createdAt: sdk.serverTimestamp() });
+  batch.set(sdk.doc(db, COLLECTIONS.transactions, rentalTransactionId(rentalRef.id)), {
     ...buildIncomeTransaction(rentalRef.id, data),
-    createdAt: serverTimestamp(),
+    createdAt: sdk.serverTimestamp(),
   });
   await batch.commit();
   return rentalRef.id;
@@ -73,26 +75,31 @@ export async function createRental(input: RentalInput, carLabel: string): Promis
 /** Met à jour la location et resynchronise la transaction liée (montant, date, voiture). */
 export async function updateRental(id: string, input: RentalInput, carLabel: string): Promise<void> {
   await assertNoOverlap(input, id);
+  const { sdk, db } = await loadFirestore();
   const data = buildRentalData(input, carLabel);
 
-  const batch = writeBatch(db);
-  batch.update(doc(db, COLLECTIONS.rentals, id), { ...data });
+  const batch = sdk.writeBatch(db);
+  batch.update(sdk.doc(db, COLLECTIONS.rentals, id), { ...data });
   // merge : recrée la transaction si elle avait été supprimée, conserve son createdAt sinon.
-  batch.set(rentalTransactionRef(id), buildIncomeTransaction(id, data), { merge: true });
+  batch.set(sdk.doc(db, COLLECTIONS.transactions, rentalTransactionId(id)), buildIncomeTransaction(id, data), {
+    merge: true,
+  });
   await batch.commit();
 }
 
 /** Annule la location : l'argent n'est plus attendu, la transaction liée est supprimée. */
 export async function cancelRental(id: string): Promise<void> {
-  const batch = writeBatch(db);
-  batch.update(doc(db, COLLECTIONS.rentals, id), { status: "annulée" });
-  batch.delete(rentalTransactionRef(id));
+  const { sdk, db } = await loadFirestore();
+  const batch = sdk.writeBatch(db);
+  batch.update(sdk.doc(db, COLLECTIONS.rentals, id), { status: "annulée" });
+  batch.delete(sdk.doc(db, COLLECTIONS.transactions, rentalTransactionId(id)));
   await batch.commit();
 }
 
 export async function deleteRental(id: string): Promise<void> {
-  const batch = writeBatch(db);
-  batch.delete(doc(db, COLLECTIONS.rentals, id));
-  batch.delete(rentalTransactionRef(id));
+  const { sdk, db } = await loadFirestore();
+  const batch = sdk.writeBatch(db);
+  batch.delete(sdk.doc(db, COLLECTIONS.rentals, id));
+  batch.delete(sdk.doc(db, COLLECTIONS.transactions, rentalTransactionId(id)));
   await batch.commit();
 }

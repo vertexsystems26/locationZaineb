@@ -1,6 +1,4 @@
-import { doc, writeBatch } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { COLLECTIONS } from "@/lib/firestore/collections";
+import { COLLECTIONS, loadFirestore } from "@/lib/firestore/collections";
 import { computeRentalStatus } from "@/lib/rental-logic";
 import type { Car, CarStatus, DateKey, Rental, RentalStatus } from "@/types";
 
@@ -40,6 +38,7 @@ export function computeStatusUpdates(cars: Car[], rentals: Rental[], today: Date
 }
 
 export async function applyStatusUpdates(updates: StatusUpdates): Promise<void> {
+  const { sdk, db } = await loadFirestore();
   // Un batch Firestore accepte 500 écritures : largement suffisant pour une petite flotte,
   // mais on découpe par sécurité.
   const writes = [
@@ -47,9 +46,9 @@ export async function applyStatusUpdates(updates: StatusUpdates): Promise<void> 
     ...updates.cars.map((u) => ({ path: COLLECTIONS.cars, ...u })),
   ];
   for (let i = 0; i < writes.length; i += 450) {
-    const batch = writeBatch(db);
+    const batch = sdk.writeBatch(db);
     for (const w of writes.slice(i, i + 450)) {
-      batch.update(doc(db, w.path, w.id), { status: w.status });
+      batch.update(sdk.doc(db, w.path, w.id), { status: w.status });
     }
     await batch.commit();
   }

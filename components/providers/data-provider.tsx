@@ -1,20 +1,16 @@
 "use client";
 
 import * as React from "react";
-import {
-  onSnapshot,
-  type CollectionReference,
-  type DocumentData,
-  type FirestoreError,
-  type QueryDocumentSnapshot,
-} from "firebase/firestore";
+import type { DocumentData, FirestoreError, QueryDocumentSnapshot } from "firebase/firestore";
 import { toast } from "sonner";
-import { carsCol, rentalsCol, transactionsCol } from "@/lib/firestore/collections";
+import { COLLECTIONS, loadFirestore } from "@/lib/firestore/collections";
 import { mapCar, mapRental, mapTransaction } from "@/lib/firestore/mappers";
 import { applyStatusUpdates, computeStatusUpdates } from "@/lib/services/status-sync";
 import { computeRentalStatus } from "@/lib/rental-logic";
 import { todayKey } from "@/lib/dates";
 import type { Car, DateKey, Rental, Transaction } from "@/types";
+
+type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];
 
 interface CollectionState<T> {
   items: T[];
@@ -47,24 +43,42 @@ function describeError(error: FirestoreError): string {
   }
 }
 
-/** Abonnement temps réel à une collection entière (petite flotte → volume faible). */
+/**
+ * Abonnement temps réel (onSnapshot) à une collection entière (petite flotte → volume faible).
+ * Le SDK est chargé dans l'effet, donc uniquement dans le navigateur.
+ */
 function useLiveCollection<T>(
-  getRef: () => CollectionReference<DocumentData>,
+  name: CollectionName,
   mapper: (snap: QueryDocumentSnapshot<DocumentData>) => T,
 ): CollectionState<T> {
   const [state, setState] = React.useState<CollectionState<T>>({ items: [], loading: true, error: null });
 
   React.useEffect(() => {
-    const unsubscribe = onSnapshot(
-      getRef(),
-      (snapshot) => setState({ items: snapshot.docs.map(mapper), loading: false, error: null }),
-      (error) => {
-        console.error("[firestore]", error);
-        setState((prev) => ({ ...prev, loading: false, error: describeError(error) }));
-      },
-    );
-    return unsubscribe;
-  }, [getRef, mapper]);
+    let unsubscribe = () => {};
+    let cancelled = false;
+    loadFirestore()
+      .then(({ sdk, db }) => {
+        if (cancelled) return;
+        unsubscribe = sdk.onSnapshot(
+          sdk.collection(db, name),
+          (snapshot) => setState({ items: snapshot.docs.map(mapper), loading: false, error: null }),
+          (error) => {
+            console.error("[firestore]", error);
+            setState((prev) => ({ ...prev, loading: false, error: describeError(error) }));
+          },
+        );
+      })
+      .catch((error: unknown) => {
+        console.error("[firestore] chargement du SDK impossible", error);
+        if (!cancelled) {
+          setState((prev) => ({ ...prev, loading: false, error: "Impossible de charger Firebase. Rechargez la page." }));
+        }
+      });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [name, mapper]);
 
   return state;
 }
@@ -83,9 +97,9 @@ function useTodayKey(): DateKey {
 }
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
-  const carsState = useLiveCollection(carsCol, mapCar);
-  const rentalsState = useLiveCollection(rentalsCol, mapRental);
-  const transactionsState = useLiveCollection(transactionsCol, mapTransaction);
+  const carsState = useLiveCollection(COLLECTIONS.cars, mapCar);
+  const rentalsState = useLiveCollection(COLLECTIONS.rentals, mapRental);
+  const transactionsState = useLiveCollection(COLLECTIONS.transactions, mapTransaction);
   const today = useTodayKey();
 
   const statusUpdates = React.useMemo(

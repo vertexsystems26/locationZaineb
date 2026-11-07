@@ -1,4 +1,4 @@
-import { Timestamp, type DocumentData, type QueryDocumentSnapshot } from "firebase/firestore";
+import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore";
 import {
   CAR_STATUSES,
   RENTAL_STATUSES,
@@ -27,14 +27,19 @@ function oneOf<T extends string>(values: readonly T[], v: unknown, fallback: T):
   return values.includes(v as T) ? (v as T) : fallback;
 }
 
+/** Timestamp Firestore détecté sans importer le SDK (chargé uniquement dans le navigateur). */
+function isTimestamp(v: unknown): v is { toDate: () => Date } {
+  return typeof v === "object" && v !== null && typeof (v as { toDate?: unknown }).toDate === "function";
+}
+
 function toDate(v: unknown): Date | null {
-  if (v instanceof Timestamp) return v.toDate();
+  if (isTimestamp(v)) return v.toDate();
   if (v instanceof Date) return v;
   return null;
 }
 
 function toKey(v: unknown): DateKey {
-  if (v instanceof Timestamp) return toDateKey(v.toDate());
+  if (isTimestamp(v)) return toDateKey(v.toDate());
   if (v instanceof Date) return toDateKey(v);
   if (typeof v === "string") {
     const key = v.slice(0, 10);

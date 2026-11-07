@@ -4,11 +4,13 @@ import * as React from "react";
 import { Toaster } from "sonner";
 import { DataProvider } from "@/components/providers/data-provider";
 import { DialogsProvider } from "@/components/providers/dialogs-provider";
-import { initAnalytics } from "@/lib/firebase";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
-    void initAnalytics();
+    // Chargé à la demande : le SDK Firebase ne doit jamais être évalué côté serveur (Workers).
+    import("@/lib/firebase")
+      .then(({ initAnalytics }) => initAnalytics())
+      .catch(() => {});
   }, []);
 
   return (
