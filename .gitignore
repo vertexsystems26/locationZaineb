@@ -25,3 +25,8 @@ firestore-debug.log*
 .DS_Store
 .vercel
 .firebase/
+
+# Cloudflare / OpenNext
+/.open-next/
+/.wrangler/
+.dev.vars*
