@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+:root {
+  --radius: 0.75rem;
+  --background: oklch(0.984 0.003 247.858);
+  --foreground: oklch(0.208 0.042 265.755);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.208 0.042 265.755);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.208 0.042 265.755);
+  --primary: oklch(0.488 0.217 264.376);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.968 0.007 247.896);
+  --secondary-foreground: oklch(0.279 0.041 260.031);
+  --muted: oklch(0.968 0.007 247.896);
+  --muted-foreground: oklch(0.554 0.046 257.417);
+  --accent: oklch(0.955 0.012 255);
+  --accent-foreground: oklch(0.208 0.042 265.755);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.929 0.013 255.508);
+  --input: oklch(0.869 0.022 252.894);
+  --ring: oklch(0.546 0.245 262.881);
+}
+
+@theme inline {
+  --font-sans: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    color-scheme: light;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+  /*
+   * Une grille sans colonnes explicites crée une piste « auto » qui s'élargit au contenu
+   * insécable (texte tronqué, tableau) et fait déborder la page sur mobile.
+   * Par défaut : une colonne minmax(0, 1fr). Les utilitaires grid-cols-* restent prioritaires.
+   */
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* Icône calendrier des champs date cliquable sur toute sa zone */
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.6;
+  }
+}
+
+/* ---------- Animations des fenêtres (Radix attend la fin de l'animation de fermeture) ---------- */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes dialog-in {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.97); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes dialog-out {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to { opacity: 0; transform: translate(-50%, -48%) scale(0.97); }
+}
+@keyframes sheet-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+@keyframes sheet-out {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
+}
+
+[data-slot="dialog-overlay"][data-state="open"] { animation: fade-in 150ms ease-out; }
+[data-slot="dialog-overlay"][data-state="closed"] { animation: fade-out 120ms ease-in; }
+[data-slot="dialog-content"][data-state="open"] { animation: dialog-in 160ms ease-out; }
+[data-slot="dialog-content"][data-state="closed"] { animation: dialog-out 120ms ease-in; }
+[data-slot="sheet-content"][data-state="open"] { animation: sheet-in 200ms ease-out; }
+[data-slot="sheet-content"][data-state="closed"] { animation: sheet-out 150ms ease-in; }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot] { animation-duration: 1ms !important; }
+}
